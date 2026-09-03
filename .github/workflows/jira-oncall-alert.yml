@@ -1,0 +1,74 @@
+name: Discord DM Alert
+
+on:
+  repository_dispatch:
+    types: [jira_ticket_alert]
+
+jobs:
+  filter-and-dm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check After-Hours Time
+        id: time_check
+        run: |
+          CURRENT_HOUR=$(TZ="America/New_York" date +'%H')
+          echo "Current local hour: $CURRENT_HOUR"
+
+          if [ "$CURRENT_HOUR" -lt 8 ] || [ "$CURRENT_HOUR" -ge 17 ]; then
+            echo "IS_AFTER_HOURS=true" >> $GITHUB_OUTPUT
+          else
+            echo "IS_AFTER_HOURS=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Dispatch Discord DM
+        if: steps.time_check.outputs.IS_AFTER_HOURS == 'true'
+        run: |
+          DM_CHANNEL_PAYLOAD=$(curl -s -f -X POST "https://discord.com" \
+            -H "Authorization: Bot ${{ secrets.DISCORD_BOT_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"recipient_id\": \"${{ secrets.DISCORD_USER_ID }}\"}")
+
+          DM_CHANNEL_ID=$(echo "$DM_CHANNEL_PAYLOAD" | jq -r '.id')
+
+          if [ "$DM_CHANNEL_ID" == "null" ] || [ -z "$DM_CHANNEL_ID" ]; then
+            echo "Error: Failed to open DM channel. Ensure your bot shares a mutual server with your Discord account."
+            exit 1
+          fi
+
+          RAW_PRIORITY="${{ github.event.client_payload.priority }}"
+          PRIORITY_UPPER=$(echo "$RAW_PRIORITY" | tr '[:lower:]' '[:upper:]')
+
+          case "$PRIORITY_UPPER" in
+            *"HIGHEST"*|*"HIGH"*|*"CRITICAL"*|*"P1"*)
+              ALERT_TEXT="There is a new **HIGH** priority ticket, you have **1h to respond and triage**."
+              SLA_WINDOW="1 Hour"
+              COLOR=15158332 # Red
+              ;;
+            *"MEDIUM"*|*"P2"*)
+              ALERT_TEXT="There is a new **MEDIUM** priority ticket, you have **2h to respond and triage**."
+              SLA_WINDOW="2 Hours"
+              COLOR=15105570 # Orange
+              ;;
+            *)
+              ALERT_TEXT="There is a new **$RAW_PRIORITY** priority ticket logged after hours."
+              SLA_WINDOW="Standard / Next Business Day"
+              COLOR=3447003 # Blue
+              ;;
+          esac
+
+          curl -s -f -X POST "https://discord.com" \
+            -H "Authorization: Bot ${{ secrets.DISCORD_BOT_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"content\": \"$ALERT_TEXT\",
+              \"embeds\": [{
+                \"title\": \"Action Required: Check Jira CR Tickets\",
+                \"description\": \"An after-hours ticket has been logged. Please go check it.\",
+                \"color\": $COLOR,
+                \"fields\": [
+                  {\"name\": \"Reported Priority\", \"value\": \"$RAW_PRIORITY\", \"inline\": true},
+                  {\"name\": \"SLA Triage Target\", \"value\": \"$SLA_WINDOW\", \"inline\": true},
+                  {\"name\": \"Alert Generated\", \"value\": \"<t:$(date +%s):t>\", \"inline\": true}
+                ]
+              }]
+            }"
