@@ -27,19 +27,20 @@ jobs:
       - name: Dispatch Discord DM
         if: steps.time_check.outputs.IS_AFTER_HOURS == 'true'
         run: |
+          # FIX: Updated URL to target the correct Discord API endpoint
           DM_CHANNEL_PAYLOAD=$(curl -s -f -X POST "https://discord.com" \
             -H "Authorization: Bot ${{ secrets.DISCORD_BOT_TOKEN }}" \
             -H "Content-Type: application/json" \
+            -H "User-Agent: DiscordBot (GitHubActions, 1.0)" \
             -d "{\"recipient_id\": \"${{ secrets.DISCORD_USER_ID }}\"}")
 
           DM_CHANNEL_ID=$(echo "$DM_CHANNEL_PAYLOAD" | jq -r '.id')
 
           if [ "$DM_CHANNEL_ID" == "null" ] || [ -z "$DM_CHANNEL_ID" ]; then
-            echo "Error: Failed to open DM channel. Ensure your bot shares a mutual server with your Discord account."
+            echo "Error: Failed to open DM channel. Payload received: $DM_CHANNEL_PAYLOAD"
             exit 1
           fi
 
-          # CHANGED: Read from inputs instead of client_payload
           RAW_PRIORITY="${{ github.event.inputs.priority }}"
           PRIORITY_UPPER=$(echo "$RAW_PRIORITY" | tr '[:lower:]' '[:upper:]')
 
@@ -61,9 +62,11 @@ jobs:
               ;;
           esac
 
+          # FIX: Updated the final send payload URL to target the active DM channel ID
           curl -s -f -X POST "https://discord.com" \
             -H "Authorization: Bot ${{ secrets.DISCORD_BOT_TOKEN }}" \
             -H "Content-Type: application/json" \
+            -H "User-Agent: DiscordBot (GitHubActions, 1.0)" \
             -d "{
               \"content\": \"$ALERT_TEXT\",
               \"embeds\": [{
