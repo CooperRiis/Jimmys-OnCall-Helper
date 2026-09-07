@@ -17,17 +17,14 @@ jobs:
         run: |
           CURRENT_HOUR=$(TZ="America/New_York" date +'%H')
           echo "Current local hour: $CURRENT_HOUR"
-
-          if [ "$CURRENT_HOUR" -lt 8 ] || [ "$CURRENT_HOUR" -ge 9 ]; then
-            echo "IS_AFTER_HOURS=true" >> $GITHUB_OUTPUT
-          else
-            echo "IS_AFTER_HOURS=false" >> $GITHUB_OUTPUT
-          fi
+          
+          # FORCE TRUE FOR TESTING 
+          echo "IS_AFTER_HOURS=true" >> $GITHUB_OUTPUT
 
       - name: Dispatch Discord DM
         if: steps.time_check.outputs.IS_AFTER_HOURS == 'true'
         run: |
-          DM_CHANNEL_PAYLOAD=$(curl -s -f -X POST "https://discord.com" \
+          DM_CHANNEL_PAYLOAD=$(curl -s -f -X POST "https://discord.com/api/v10/users/@me/channels" \
             -H "Authorization: Bot ${{ secrets.DISCORD_BOT_TOKEN }}" \
             -H "Content-Type: application/json" \
             -H "User-Agent: DiscordBot (GitHubActions, 1.0)" \
@@ -78,4 +75,3 @@ jobs:
                 ]
               }]
             }"
-
