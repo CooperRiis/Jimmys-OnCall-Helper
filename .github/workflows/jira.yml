@@ -16,48 +16,47 @@ jobs:
         run: |
           CURRENT_HOUR=$(TZ="America/New_York" date +'%H')
           echo "Current local hour: $CURRENT_HOUR"
-          # FORCE TRUE FOR TESTING
           echo "IS_AFTER_HOURS=true" >> $GITHUB_OUTPUT
 
       - name: Dispatch Discord DM
         if: steps.time_check.outputs.IS_AFTER_HOURS == 'true'
+        env:
+          BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          USER_ID: ${{ secrets.DISCORD_USER_ID }}
+          PRIORITY: ${{ github.event.inputs.priority }}
         run: |
-          DM_CHANNEL_PAYLOAD=$(curl -s -f -X POST "https://discord.com/api/v10/users/@me/channels" \
-            -H "Authorization: Bot ${{ secrets.DISCORD_BOT_TOKEN }}" \
+          # Step 1: Create DM channel
+          DM_RESPONSE=$(curl -s -X POST "https://discord.com/api/v10/users/@me/channels" \
+            -H "Authorization: Bot $BOT_TOKEN" \
             -H "Content-Type: application/json" \
-            -H "User-Agent: DiscordBot (GitHubActions, 1.0)" \
-            -d "{\"recipient_id\": \"${{ secrets.DISCORD_USER_ID }}\"}")
+            -d "{\"recipient_id\": \"$USER_ID\"}")
           
-          DM_CHANNEL_ID=$(echo "$DM_CHANNEL_PAYLOAD" | jq -r '.id')
+          DM_CHANNEL_ID=$(echo "$DM_RESPONSE" | jq -r '.id')
           
-          if [ "$DM_CHANNEL_ID" == "null" ] || [ -z "$DM_CHANNEL_ID" ]; then
-            echo "Error: Failed to open DM channel. Payload received: $DM_CHANNEL_PAYLOAD"
+          if [ -z "$DM_CHANNEL_ID" ] || [ "$DM_CHANNEL_ID" = "null" ]; then
+            echo "Error creating DM channel:"
+            echo "$DM_RESPONSE"
             exit 1
           fi
           
-          RAW_PRIORITY="${{ github.event.inputs.priority }}"
-          PRIORITY_UPPER=$(echo "$RAW_PRIORITY" | tr '[:lower:]' '[:upper:]')
+          echo "DM Channel ID: $DM_CHANNEL_ID"
           
-          case "$PRIORITY_UPPER" in
-            *"HIGHEST"*|*"HIGH"*|*"CRITICAL"*|*"P1"*)
-              ALERT_TEXT="There is a new **HIGH** priority ticket, you have **1h to respond and triage**."
-              SLA_WINDOW="1 Hour"
-              COLOR=15158332
-              ;;
-            *"MEDIUM"*|*"P2"*)
-              ALERT_TEXT="There is a new **MEDIUM** priority ticket, you have **2h to respond and triage**."
-              SLA_WINDOW="2 Hours"
-              COLOR=15105570
-              ;;
-            *)
-              ALERT_TEXT="There is a new **$RAW_PRIORITY** priority ticket logged after hours."
-              SLA_WINDOW="Standard / Next Business Day"
-              COLOR=3447003
-              ;;
-          esac
+          PRIORITY_UPPER=$(echo "$PRIORITY" | tr '[:lower:]' '[:upper:]')
           
-          MESSAGE_RESPONSE=$(curl -s -X POST "https://discord.com/api/v10/channels/$DM_CHANNEL_ID/messages" \
-            -H "Authorization: Bot ${{ secrets.DISCORD_BOT_TOKEN }}" \
+          if [[ "$PRIORITY_UPPER" =~ (HIGHEST|HIGH|CRITICAL|P1) ]]; then
+            ALERT_TEXT="**HIGH PRIORITY TICKET** - You have **1 hour** to respond and triage."
+            COLOR=15158332
+          elif [[ "$PRIORITY_UPPER" =~ (MEDIUM|P2) ]]; then
+            ALERT_TEXT="**MEDIUM PRIORITY TICKET** - You have **2 hours** to respond and triage."
+            COLOR=15105570
+          else
+            ALERT_TEXT="**NEW TICKET** - Priority: $PRIORITY"
+            COLOR=3447003
+          fi
+          
+          curl -s -X POST "https://discord.com/api/v10/channels/$DM_CHANNEL_ID/messages" \
+            -H "Authorization: Bot $BOT_TOKEN" \
             -H "Content-Type: application/json" \
-            -H "User-Agent: DiscordBot (GitHubActions, 1.0)" \
-            -d "{ \"content\": \"$ALERT_TEXT\", \"embeds\": [{ \"title\": \"Action Required: Check Jira CR Tickets\", \"description\": \"An after-hours ticket has been logged. Please go check it.\", \"color\": $COLOR, \"fields\": [ {\"name\": \"Reported
+            -d "{\"content\": \"$ALERT_TEXT\", \"embeds\": [{\"title\": \"Action Required: Check Jira\", \"description\": \"An after-hours ticket has been logged.\", \"color\": $COLOR}]}"
+          
+          echo "Message sent successfully!"
