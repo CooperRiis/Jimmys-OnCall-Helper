@@ -1,8 +1,12 @@
 name: Discord DM Alert
 
 on:
-  repository_dispatch:
-    types: [jira_ticket_alert]
+  workflow_dispatch:
+    inputs:
+      priority:
+        description: 'The priority of the Jira ticket'
+        required: true
+        type: string
 
 jobs:
   filter-and-dm:
@@ -35,7 +39,8 @@ jobs:
             exit 1
           fi
 
-          RAW_PRIORITY="${{ github.event.client_payload.priority }}"
+          # CHANGED: Read from inputs instead of client_payload
+          RAW_PRIORITY="${{ github.event.inputs.priority }}"
           PRIORITY_UPPER=$(echo "$RAW_PRIORITY" | tr '[:lower:]' '[:upper:]')
 
           case "$PRIORITY_UPPER" in
