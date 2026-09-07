@@ -59,6 +59,8 @@ jobs:
           esac
 
           curl -s -f -X POST "https://discord.com" \
+          # Modified to capture and print the literal output feedback from Discord
+          MESSAGE_RESPONSE=$(curl -s -X POST "https://discord.com" \
             -H "Authorization: Bot ${{ secrets.DISCORD_BOT_TOKEN }}" \
             -H "Content-Type: application/json" \
             -H "User-Agent: DiscordBot (GitHubActions, 1.0)" \
@@ -74,4 +76,7 @@ jobs:
                   {\"name\": \"Alert Generated\", \"value\": \"<t:$(date +%s):t>\", \"inline\": true}
                 ]
               }]
-            }"
+            }")
+
+          echo "Discord Server Response Output: $MESSAGE_RESPONSE"
+
