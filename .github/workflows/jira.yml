@@ -27,7 +27,6 @@ jobs:
       - name: Dispatch Discord DM
         if: steps.time_check.outputs.IS_AFTER_HOURS == 'true'
         run: |
-          # FIX: Updated URL to target the correct Discord API endpoint
           DM_CHANNEL_PAYLOAD=$(curl -s -f -X POST "https://discord.com" \
             -H "Authorization: Bot ${{ secrets.DISCORD_BOT_TOKEN }}" \
             -H "Content-Type: application/json" \
@@ -48,21 +47,20 @@ jobs:
             *"HIGHEST"*|*"HIGH"*|*"CRITICAL"*|*"P1"*)
               ALERT_TEXT="There is a new **HIGH** priority ticket, you have **1h to respond and triage**."
               SLA_WINDOW="1 Hour"
-              COLOR=15158332 # Red
+              COLOR=15158332
               ;;
             *"MEDIUM"*|*"P2"*)
               ALERT_TEXT="There is a new **MEDIUM** priority ticket, you have **2h to respond and triage**."
               SLA_WINDOW="2 Hours"
-              COLOR=15105570 # Orange
+              COLOR=15105570
               ;;
             *)
               ALERT_TEXT="There is a new **$RAW_PRIORITY** priority ticket logged after hours."
               SLA_WINDOW="Standard / Next Business Day"
-              COLOR=3447003 # Blue
+              COLOR=3447003
               ;;
           esac
 
-          # FIX: Updated the final send payload URL to target the active DM channel ID
           curl -s -f -X POST "https://discord.com" \
             -H "Authorization: Bot ${{ secrets.DISCORD_BOT_TOKEN }}" \
             -H "Content-Type: application/json" \
@@ -80,3 +78,4 @@ jobs:
                 ]
               }]
             }"
+
