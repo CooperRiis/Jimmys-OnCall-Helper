@@ -1,0 +1,36 @@
+name: Discord DM Shift End Alert
+on:
+  workflow_dispatch:
+
+jobs:
+  filter-and-dm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Discord DM
+        env:
+          BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          USER_ID: ${{ secrets.DISCORD_USER_ID }}
+        run: |
+          DM_RESPONSE=$(curl -s -X POST "https://discord.com/api/v10/users/@me/channels" \
+            -H "Authorization: Bot $BOT_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"recipient_id\": \"$USER_ID\"}")
+          
+          DM_CHANNEL_ID=$(echo "$DM_RESPONSE" | jq -r '.id')
+          
+          if [ -z "$DM_CHANNEL_ID" ] || [ "$DM_CHANNEL_ID" = "null" ]; then
+            echo "Error creating DM channel:"
+            echo "$DM_RESPONSE"
+            exit 1
+          fi
+          
+          echo "DM Channel ID: $DM_CHANNEL_ID"
+          
+          ALERT_TEXT="Your On-Call Shift has ended! Have a good night!"
+          
+          curl -s -X POST "https://discord.com/api/v10/channels/$DM_CHANNEL_ID/messages" \
+            -H "Authorization: Bot $BOT_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"content\": \"$ALERT_TEXT\"}"
+          
+          echo "Message sent successfully!"
