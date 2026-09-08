@@ -1,12 +1,25 @@
-name: Discord DM Shift End Alert
+name: Discord DM On-Call Shift End Alert
 on:
   workflow_dispatch:
+    inputs:
+      priority:
+        description: 'The priority of the Jira ticket'
+        required: true
+        type: string
 
 jobs:
   filter-and-dm:
     runs-on: ubuntu-latest
     steps:
+      - name: Check After-Hours Time
+        id: time_check
+        run: |
+          CURRENT_HOUR=$(TZ="America/New_York" date +'%H')
+          echo "Current local hour: $CURRENT_HOUR"
+          echo "IS_AFTER_HOURS=true" >> $GITHUB_OUTPUT
+
       - name: Dispatch Discord DM
+        if: steps.time_check.outputs.IS_AFTER_HOURS == 'true'
         env:
           BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           USER_ID: ${{ secrets.DISCORD_USER_ID }}
@@ -26,11 +39,9 @@ jobs:
           
           echo "DM Channel ID: $DM_CHANNEL_ID"
           
-          ALERT_TEXT="Your On-Call Shift has ended! Have a good night!"
-          
           curl -s -X POST "https://discord.com/api/v10/channels/$DM_CHANNEL_ID/messages" \
             -H "Authorization: Bot $BOT_TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"content\": \"$ALERT_TEXT\"}"
+            -d '{"content": "Your On-Call Shift has ended! Have a good night!"}'
           
           echo "Message sent successfully!"
