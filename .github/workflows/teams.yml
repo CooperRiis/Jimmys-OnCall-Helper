@@ -42,6 +42,6 @@ jobs:
           curl -s -X POST "https://discord.com/api/v10/channels/$DM_CHANNEL_ID/messages" \
             -H "Authorization: Bot $BOT_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"content": "You Have Recieved A Teams Message after hours, go check it when you're available!"}'
+            -d "{\"content\": \"You Have Received A Teams Message after hours, go check it when you're available!\"}"
           
           echo "Message sent successfully!"
