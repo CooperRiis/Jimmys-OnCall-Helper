@@ -4,7 +4,7 @@ on:
     inputs:
       priority:
         description: 'The priority of the Jira ticket'
-        required: true
+        required: false
         type: string
 
 jobs:
