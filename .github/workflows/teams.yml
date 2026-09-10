@@ -1,0 +1,47 @@
+name: Discord DM Teams After-Hours Notif Helper
+on:
+  workflow_dispatch:
+    inputs:
+      priority:
+        description: 'The priority of the Jira ticket'
+        required: true
+        type: string
+
+jobs:
+  filter-and-dm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check After-Hours Time
+        id: time_check
+        run: |
+          CURRENT_HOUR=$(TZ="America/New_York" date +'%H')
+          echo "Current local hour: $CURRENT_HOUR"
+          echo "IS_AFTER_HOURS=true" >> $GITHUB_OUTPUT
+
+      - name: Dispatch Discord DM
+        if: steps.time_check.outputs.IS_AFTER_HOURS == 'true'
+        env:
+          BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          USER_ID: ${{ secrets.DISCORD_USER_ID }}
+        run: |
+          DM_RESPONSE=$(curl -s -X POST "https://discord.com/api/v10/users/@me/channels" \
+            -H "Authorization: Bot $BOT_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"recipient_id\": \"$USER_ID\"}")
+          
+          DM_CHANNEL_ID=$(echo "$DM_RESPONSE" | jq -r '.id')
+          
+          if [ -z "$DM_CHANNEL_ID" ] || [ "$DM_CHANNEL_ID" = "null" ]; then
+            echo "Error creating DM channel:"
+            echo "$DM_RESPONSE"
+            exit 1
+          fi
+          
+          echo "DM Channel ID: $DM_CHANNEL_ID"
+          
+          curl -s -X POST "https://discord.com/api/v10/channels/$DM_CHANNEL_ID/messages" \
+            -H "Authorization: Bot $BOT_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"content": "You Have Recieved A Teams Message after hours, go check it when you're available!"}'
+          
+          echo "Message sent successfully!"
